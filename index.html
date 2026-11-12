@@ -77,6 +77,14 @@ h1 span{color:var(--accent)}
 .vol input{flex:1;accent-color:var(--accent)}
 button:focus-visible,input:focus-visible,summary:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 
+.micbox{display:flex;flex-direction:column;gap:8px;border-top:1px solid var(--line);padding-top:12px}
+.btn.mic{justify-content:center;border-color:var(--res);color:var(--res);font-weight:700}
+.btn.mic.on{background:var(--res);color:var(--panel)}
+.btn.mic.on svg{animation:pulse 1s infinite}
+@keyframes pulse{50%{opacity:.35}}
+.mic-hint{margin:0;font-size:13px;color:var(--muted)}
+.mic-err{margin:0;font-size:13px;color:var(--accent);overflow-wrap:anywhere}
+.mic-err a{color:inherit;font-weight:700}
 details.answers{border-top:1px solid var(--line);padding-top:12px}
 details.answers summary{cursor:pointer;font-weight:700;font-size:14px}
 details.answers p{margin:6px 0 8px;font-size:13px;color:var(--muted)}
@@ -141,6 +149,12 @@ details.answers p{margin:6px 0 8px;font-size:13px;color:var(--muted)}
       </div>
       <div class="vol"><label for="vol">음량</label><input type="range" id="vol" min="0" max="100" value="35"></div>
 
+      <div class="micbox">
+        <button class="btn mic" id="mic" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg><span id="mic-label">마이크로 내 소리 넣기</span></button>
+        <p class="mic-hint" id="mic-hint" hidden>‘아~’ 하고 길게 소리 내거나 휘파람을 불어 보세요. 목소리를 천천히 높이거나 낮추면서 무늬가 생기는 높이를 찾아보세요. 크게 낼수록 판이 세게 흔들려요.</p>
+        <p class="mic-err" id="mic-err" hidden></p>
+      </div>
+
       <details class="answers" id="answers">
         <summary>공명 진동수 목록 보기 (정답)</summary>
         <p>무늬가 뚜렷하게 생기는 진동수예요. 먼저 슬라이더로 직접 찾아본 뒤에 열어 보세요.</p>
@@ -164,11 +178,12 @@ details.answers p{margin:6px 0 8px;font-size:13px;color:var(--muted)}
         <li>진동수가 높아질수록 무늬는 어떻게 달라질까?</li>
         <li>정사각형 판과 원형 판의 무늬는 어떻게 다를까?</li>
         <li>공명하지 않을 때 모래는 어떻게 될까?</li>
+        <li>내 목소리나 휘파람으로 무늬를 만들 수 있을까?</li>
       </ul>
     </section>
   </div>
 
-  <p class="foot">이 화면은 진동판의 수학 공식으로 계산한 시뮬레이션이에요. 실제 판은 재질·두께·크기에 따라 같은 무늬가 나오는 진동수가 달라요. 높은 소리는 귀에 불편할 수 있으니 음량을 낮게 두고 시작하세요.</p>
+  <p class="foot">이 화면은 진동판의 수학 공식으로 계산한 시뮬레이션이에요. 실제 판은 재질·두께·크기에 따라 같은 무늬가 나오는 진동수가 달라요. 높은 소리는 귀에 불편할 수 있으니 음량을 낮게 두고 시작하세요. 마이크 기능은 GitHub 주소(parkchan70.github.io/sound-pattern-lab)에서 Chrome이나 Safari로 열었을 때 쓸 수 있고, 목소리는 어디에도 저장되지 않아요.</p>
 </div>
 
 <script>
@@ -214,10 +229,10 @@ details.answers p{margin:6px 0 8px;font-size:13px;color:var(--muted)}
   /* ---------- state ---------- */
   const state = { shape:"square", f:380, sweeping:false, soundOn:false };
   const modes = () => state.shape === "square" ? SQUARE : CIRCLE;
-  function nearest(f){
+  function nearest(f, mul){
     let best = null, bd = 1e9;
     for (const m of modes()){ const d = Math.abs(f-m.f); if (d<bd){ bd=d; best=m; } }
-    const w = 6 + 0.012*best.f;
+    const w = (6 + 0.012*best.f) * (mul || 1);
     return { mode:best, R: 1/(1+Math.pow(bd/w,2)) };
   }
 
@@ -300,7 +315,7 @@ details.answers p{margin:6px 0 8px;font-size:13px;color:var(--muted)}
     osc = null; state.soundOn = false; soundUI();
   }
   function soundUI(){ $("sound-label").textContent = state.soundOn ? "소리 끄기" : "소리 켜기"; $("sound").classList.toggle("on", state.soundOn); $("sound").classList.toggle("primary", !state.soundOn); }
-  $("sound").addEventListener("click", ()=> state.soundOn ? soundStop() : soundStart());
+  $("sound").addEventListener("click", ()=>{ if (state.soundOn) soundStop(); else { if (micOn) micStop(); soundStart(); } });
   $("vol").addEventListener("input", ()=>{ if (gain && ac) gain.gain.setTargetAtTime(vol(), ac.currentTime, 0.05); });
 
   /* ---------- frequency ---------- */
@@ -313,12 +328,79 @@ details.answers p{margin:6px 0 8px;font-size:13px;color:var(--muted)}
     if (osc && ac) osc.frequency.setTargetAtTime(state.f, ac.currentTime, 0.03);
     const r = Math.round(state.f);
     $("hz").textContent = r;
-    $("note").textContent = "1초에 " + r.toLocaleString() + "번 진동 · " + noteName(state.f) + " 근처";
+    $("note").textContent = (micOn ? "마이크로 들은 소리 · " : "1초에 " + r.toLocaleString() + "번 진동 · ") + noteName(state.f) + " 근처";
   }
-  $("freq").addEventListener("input", e=>{ stopSweep(); setFreq(+e.target.value, true); });
-  document.querySelectorAll("[data-step]").forEach(b=> b.addEventListener("click", ()=>{ stopSweep(); setFreq(state.f + +b.dataset.step); }));
+  $("freq").addEventListener("input", e=>{ stopSweep(); micStop(); setFreq(+e.target.value, true); });
+  document.querySelectorAll("[data-step]").forEach(b=> b.addEventListener("click", ()=>{ stopSweep(); micStop(); setFreq(state.f + +b.dataset.step); }));
 
-  function startSweep(){ state.sweeping = true; if (state.f >= 1990) setFreq(100); $("sweep-label").textContent = "멈추기"; $("sweep").classList.add("on"); if (!state.soundOn) soundStart(); }
+  /* ---------- microphone: the viewer's own voice drives the plate ---------- */
+  const APP_URL = "https://parkchan70.github.io/sound-pattern-lab/";
+  let micOn = false, micStream = null, analyser = null, micBuf = null, micLevel = 0, pitchHist = [];
+  function micUI(){
+    $("mic").classList.toggle("on", micOn);
+    $("mic-label").textContent = micOn ? "마이크 끄기" : "마이크로 내 소리 넣기";
+    $("mic-hint").hidden = !micOn;
+    if (micOn) $("mic-err").hidden = true;
+  }
+  function micError(html){ const e = $("mic-err"); e.innerHTML = html; e.hidden = false; }
+  async function micStart(){
+    stopSweep(); if (state.soundOn) soundStop();
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      micError('이 화면에서는 마이크를 쓸 수 없어요. <a href="' + APP_URL + '" target="_blank" rel="noopener">GitHub 주소</a>로 열어 Chrome이나 Safari에서 사용해 주세요.'); return;
+    }
+    try {
+      ac = ac || new (window.AudioContext || window.webkitAudioContext)();
+      const resumed = ac.state === "suspended" ? ac.resume() : null;
+      micStream = await navigator.mediaDevices.getUserMedia({ audio:{ echoCancellation:false, noiseSuppression:false, autoGainControl:false } });
+      if (resumed) await resumed;
+      const src = ac.createMediaStreamSource(micStream);
+      analyser = ac.createAnalyser(); analyser.fftSize = 2048; src.connect(analyser);
+      micBuf = new Float32Array(analyser.fftSize); pitchHist = []; micLevel = 0;
+      micOn = true; micUI();
+    } catch(e) {
+      micStop();
+      micError('마이크를 켜지 못했어요. 브라우저 주소창 옆에서 마이크를 허용했는지 확인해 주세요. Claude 링크로 열었다면 마이크가 막혀 있으니 <a href="' + APP_URL + '" target="_blank" rel="noopener">GitHub 주소</a>로 열어 주세요.');
+    }
+  }
+  function micStop(){
+    if (micStream) micStream.getTracks().forEach(t=>t.stop());
+    micStream = null; analyser = null; micOn = false; micLevel = 0; micUI();
+  }
+  $("mic").addEventListener("click", ()=> micOn ? micStop() : micStart());
+
+  // Autocorrelation pitch detection, 90–2000 Hz
+  function detectPitch(){
+    analyser.getFloatTimeDomainData(micBuf);
+    const buf = micBuf, n = buf.length;
+    let rms = 0; for (let i=0;i<n;i++) rms += buf[i]*buf[i]; rms = Math.sqrt(rms/n);
+    if (rms < 0.01) return { rms, f:0 };
+    const sr = ac.sampleRate, minLag = Math.floor(sr/2000), maxLag = Math.min(n-1, Math.ceil(sr/90));
+    const c = new Float32Array(maxLag+2); let best = 0;
+    for (let lag=minLag; lag<=maxLag+1; lag++){
+      let s = 0; for (let i=0;i+lag<n;i++) s += buf[i]*buf[i+lag];
+      c[lag] = s / (n-lag); if (lag<=maxLag && c[lag] > best) best = c[lag];
+    }
+    if (best <= 0) return { rms, f:0 };
+    let lag = -1;
+    for (let l=minLag+1; l<=maxLag; l++) if (c[l] > 0.9*best && c[l] >= c[l-1] && c[l] >= c[l+1]) { lag = l; break; }
+    if (lag < 0) return { rms, f:0 };
+    const a = c[lag-1], b = c[lag], d = c[lag+1], den = a - 2*b + d;
+    const shift = den ? 0.5*(a-d)/den : 0;
+    return { rms, f: sr/(lag+shift) };
+  }
+  function micTick(){
+    const p = detectPitch();
+    let target = 0;
+    if (p.f >= 90 && p.f <= 2000) {
+      pitchHist.push(p.f); if (pitchHist.length > 5) pitchHist.shift();
+      const sorted = pitchHist.slice().sort((x,y)=>x-y);
+      setFreq(sorted[sorted.length>>1]);
+      target = Math.min(1, p.rms*12);
+    } else if (p.rms < 0.01) pitchHist = [];
+    micLevel = micLevel*0.85 + target*0.15;
+  }
+
+  function startSweep(){ micStop(); state.sweeping = true; if (state.f >= 1990) setFreq(100); $("sweep-label").textContent = "멈추기"; $("sweep").classList.add("on"); if (!state.soundOn) soundStart(); }
   function stopSweep(){ state.sweeping = false; $("sweep-label").textContent = "진동수 자동으로 올리기"; $("sweep").classList.remove("on"); }
   $("sweep").addEventListener("click", ()=> state.sweeping ? stopSweep() : startSweep());
 
@@ -348,18 +430,23 @@ details.answers p{margin:6px 0 8px;font-size:13px;color:var(--muted)}
       setFreq(state.f + dt * 40 * (1 - 0.93*R));
       if (state.f >= 2000) stopSweep();
     }
-    const {mode, R} = nearest(state.f);
+    if (micOn && analyser) micTick();
+    const near = nearest(state.f, micOn ? 2.5 : 1);
+    const mode = near.mode, R = micOn ? near.R * micLevel : near.R;
     buildField(mode);
     const subs = 3;
     for (let s=0;s<subs;s++) step(R);
-    shake = state.soundOn ? 0.6 + 1.6*R : 0;
+    shake = state.soundOn ? 0.6 + 1.6*R : micOn ? 2*R : 0;
     draw(R);
-    $("meter").style.width = Math.round(R*100) + "%";
+    $("meter").style.width = Math.round((micOn ? Math.max(R, micLevel*0.5) : R)*100) + "%";
     const on = R > 0.5;
-    if (on !== lastOn) {
-      lastOn = on;
+    const key = on ? "on" : (micOn && micLevel < 0.08) ? "quiet" : "off";
+    if (key !== lastOn) {
+      lastOn = key;
       $("status").classList.toggle("on", on);
-      $("status-text").textContent = on ? "공명! 무늬가 만들어지고 있어요" : "공명하지 않아요 · 판이 거의 흔들리지 않아요";
+      $("status-text").textContent = on ? "공명! 무늬가 만들어지고 있어요"
+        : key === "quiet" ? "마이크가 듣고 있어요 · 소리를 길게 내 보세요"
+        : "공명하지 않아요 · 판이 거의 흔들리지 않아요";
     }
     requestAnimationFrame(frame);
   }
