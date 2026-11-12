@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}[hidden]{display:none!important}</style>
+</head>
+<body>
+<title>소리 무늬 실험실</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+/* Layout: lab bench — the vibrating plate (always dark metal, like the real experiment) on the left, a function-generator style control panel on the right, explanation underneath. */
+:root{
+  --bg:#ECEFF1; --panel:#FFFFFF; --ink:#172026; --muted:#5D6A72; --line:#D5DCE0;
+  --accent:#E0782B; --accent-ink:#FFFFFF; --res:#1E9E6A; --res-bg:#DDF3E9; --off:#8A949A; --off-bg:#EDF0F2;
+  --lcd:#13201A; --lcd-ink:#7CF0B4; --plate:#23282C; --plate-rim:#3A4248; --sand:#F1E6CC;
+  --ko:"Noto Sans KR","Malgun Gothic","Apple SD Gothic Neo",sans-serif;
+  --mono:"JetBrains Mono",Consolas,monospace;
+  --r:14px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0F1417; --panel:#182025; --ink:#E5ECEF; --muted:#94A3AB; --line:#27333A;
+  --accent:#F29A55; --accent-ink:#1A0F05; --res:#4FD49B; --res-bg:#17372A; --off:#8C979D; --off-bg:#1F292F; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0F1417; --panel:#182025; --ink:#E5ECEF; --muted:#94A3AB; --line:#27333A;
+  --accent:#F29A55; --accent-ink:#1A0F05; --res:#4FD49B; --res-bg:#17372A; --off:#8C979D; --off-bg:#1F292F; color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--ko);font-size:15px;line-height:1.6;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:24px 48px}
+.wrap{max-width:1100px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+header{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:10px}
+h1{margin:0;font-size:28px;font-weight:900;letter-spacing:-.02em;text-wrap:balance}
+h1 span{color:var(--accent)}
+.sub{margin:2px 0 0;color:var(--muted);font-size:14px}
+.unit{font-family:var(--mono);font-size:12px;color:var(--muted);letter-spacing:.04em}
+
+.bench{display:grid;grid-template-columns:minmax(0,1fr) minmax(300px,400px);gap:18px;align-items:start}
+.plate-wrap{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.plate-stage{position:relative;width:100%;aspect-ratio:1/1;max-width:100%}
+#plate{width:100%;height:100%;display:block}
+.plate-bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:space-between}
+.seg{display:flex;gap:4px;background:var(--off-bg);border-radius:999px;padding:4px}
+.seg button{border:0;background:transparent;color:var(--muted);font:500 14px var(--ko);padding:6px 14px;border-radius:999px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--panel);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.15)}
+
+.gen{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:18px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.gen h2{margin:0;font-size:15px;font-weight:700;display:flex;justify-content:space-between;align-items:baseline}
+.lcd{background:var(--lcd);border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:2px}
+.lcd .hz{font:700 44px/1 var(--mono);color:var(--lcd-ink);font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.lcd .hz small{font-size:18px;margin-left:6px;opacity:.8}
+.lcd .note{font:500 13px var(--mono);color:var(--lcd-ink);opacity:.7}
+.status{display:flex;align-items:center;gap:8px;border-radius:10px;padding:8px 12px;font-weight:700;font-size:14px;background:var(--off-bg);color:var(--off);transition:background .2s,color .2s}
+.status i{width:10px;height:10px;border-radius:50%;background:currentColor;flex:none}
+.status.on{background:var(--res-bg);color:var(--res)}
+.meter{height:6px;border-radius:3px;background:var(--off-bg);overflow:hidden}
+.meter div{height:100%;width:0;background:var(--res);transition:width .1s}
+
+.slider{display:flex;flex-direction:column;gap:4px}
+.track{position:relative}
+#freq{width:100%;accent-color:var(--accent);margin:0}
+.ticks{position:relative;height:10px}
+.ticks span{position:absolute;top:0;width:2px;height:10px;background:var(--res);border-radius:1px;transform:translateX(-1px)}
+.scale{display:flex;justify-content:space-between;font:12px var(--mono);color:var(--muted)}
+.fine{display:flex;gap:6px;flex-wrap:wrap}
+.btn{border:1px solid var(--line);background:var(--panel);color:var(--ink);font:500 14px var(--ko);padding:8px 12px;border-radius:10px;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:700}
+.btn.on{background:var(--ink);border-color:var(--ink);color:var(--panel)}
+.btn svg{width:16px;height:16px;flex:none}
+.btn.mono{font-family:var(--mono);font-size:13px}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.row .btn{flex:1 1 auto;justify-content:center}
+.vol{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--muted)}
+.vol input{flex:1;accent-color:var(--accent)}
+button:focus-visible,input:focus-visible,summary:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+
+details.answers{border-top:1px solid var(--line);padding-top:12px}
+details.answers summary{cursor:pointer;font-weight:700;font-size:14px}
+details.answers p{margin:6px 0 8px;font-size:13px;color:var(--muted)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--res);color:var(--res);background:var(--res-bg);border-radius:999px;padding:3px 10px;font:500 12px var(--mono);cursor:pointer;font-variant-numeric:tabular-nums}
+
+.learn{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:18px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.card h3{margin:0;font-size:16px}
+.card p{margin:0;color:var(--muted);font-size:14px}
+.card b{color:var(--ink)}
+.q{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;font-size:14px;color:var(--muted)}
+.q li::before{content:"Q. ";font-weight:700;color:var(--accent);font-family:var(--mono)}
+.foot{font-size:13px;color:var(--muted)}
+
+@media (max-width:860px){ .bench{grid-template-columns:1fr} .learn{grid-template-columns:1fr} }
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1>소리 <span>무늬</span> 실험실</h1>
+      <p class="sub">진동판 위에 모래를 뿌리고 소리를 들려주면, 진동수에 따라 서로 다른 무늬가 나타나요.</p>
+    </div>
+    <span class="unit">클라드니 도형 · 파동과 소리 · 공명</span>
+  </header>
+
+  <div class="bench">
+    <section class="plate-wrap">
+      <div class="plate-stage"><canvas id="plate" aria-label="모래가 뿌려진 진동판"></canvas></div>
+      <div class="plate-bar">
+        <div class="seg" role="group" aria-label="판 모양">
+          <button type="button" data-shape="square" aria-pressed="true">정사각형 판</button>
+          <button type="button" data-shape="circle" aria-pressed="false">원형 판</button>
+        </div>
+        <button class="btn" id="resand" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>모래 다시 뿌리기</button>
+      </div>
+    </section>
+
+    <section class="gen" aria-label="소리 발생기">
+      <h2>소리 발생기 <span class="unit">SINE WAVE</span></h2>
+      <div class="lcd" aria-live="polite"><div class="hz"><span id="hz">380</span><small>Hz</small></div><div class="note" id="note">1초에 380번 진동 · 솔#4 (G#4) 근처</div></div>
+      <div class="status" id="status"><i></i><span id="status-text">공명! 무늬가 만들어지고 있어요</span></div>
+      <div class="meter" aria-hidden="true"><div id="meter"></div></div>
+
+      <div class="slider">
+        <label for="freq" class="unit">진동수 바꾸기 (100 ~ 2000 Hz)</label>
+        <div class="track"><input type="range" id="freq" min="100" max="2000" step="1" value="380"></div>
+        <div class="ticks" id="ticks" hidden></div>
+        <div class="scale"><span>100</span><span>500</span><span>1000</span><span>1500</span><span>2000</span></div>
+      </div>
+      <div class="fine">
+        <button class="btn mono" type="button" data-step="-10">−10</button>
+        <button class="btn mono" type="button" data-step="-1">−1</button>
+        <button class="btn mono" type="button" data-step="1">+1</button>
+        <button class="btn mono" type="button" data-step="10">+10</button>
+      </div>
+
+      <div class="row">
+        <button class="btn primary" id="sound" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11"/></svg><span id="sound-label">소리 켜기</span></button>
+        <button class="btn" id="sweep" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17c3 0 3-10 6-10s3 10 6 10 3-10 6-10"/></svg><span id="sweep-label">진동수 자동으로 올리기</span></button>
+      </div>
+      <div class="vol"><label for="vol">음량</label><input type="range" id="vol" min="0" max="100" value="35"></div>
+
+      <details class="answers" id="answers">
+        <summary>공명 진동수 목록 보기 (정답)</summary>
+        <p>무늬가 뚜렷하게 생기는 진동수예요. 먼저 슬라이더로 직접 찾아본 뒤에 열어 보세요.</p>
+        <div class="chips" id="chips"></div>
+      </details>
+    </section>
+  </div>
+
+  <div class="learn">
+    <section class="card">
+      <h3>모래는 왜 선 위로 모일까?</h3>
+      <p>소리가 판을 흔들면 판의 어떤 곳은 크게 흔들리고(<b>배</b>), 어떤 곳은 거의 흔들리지 않아요(<b>마디</b>). 크게 흔들리는 곳의 모래는 튕겨 나가고, 흔들리지 않는 <b>마디선</b>에 모래가 쌓여 무늬가 돼요.</p>
+    </section>
+    <section class="card">
+      <h3>아무 진동수에서나 생길까?</h3>
+      <p>판이 잘 흔들리는 특별한 진동수가 있어요. 그 진동수의 소리를 들려주면 판이 크게 진동하는데, 이것을 <b>공명</b>이라고 해요. 공명할 때만 무늬가 뚜렷하게 나타나요.</p>
+    </section>
+    <section class="card">
+      <h3>탐구해 보기</h3>
+      <ul class="q">
+        <li>진동수가 높아질수록 무늬는 어떻게 달라질까?</li>
+        <li>정사각형 판과 원형 판의 무늬는 어떻게 다를까?</li>
+        <li>공명하지 않을 때 모래는 어떻게 될까?</li>
+      </ul>
+    </section>
+  </div>
+
+  <p class="foot">이 화면은 진동판의 수학 공식으로 계산한 시뮬레이션이에요. 실제 판은 재질·두께·크기에 따라 같은 무늬가 나오는 진동수가 달라요. 높은 소리는 귀에 불편할 수 있으니 음량을 낮게 두고 시작하세요.</p>
+</div>
+
+<script>
+(function(){
+  const $ = id => document.getElementById(id);
+
+  /* ---------- vibration modes ---------- */
+  // Square plate: f(x,y) = cos(nπx)cos(mπy) ± cos(mπx)cos(nπy), x,y in [0,1]. Frequency ∝ n²+m².
+  const SQUARE = [
+    [1,2,-1],[1,3,-1],[1,3,1],[2,3,-1],[1,4,-1],[2,4,1],[3,4,-1],[1,5,1],[2,5,-1],[3,5,1],[1,6,-1],[4,5,-1],[3,6,1],[2,7,-1]
+  ].map(([n,m,s])=>({ kind:"square", n, m, s, f: Math.round(38*(n*n+m*m)*(s>0?1.06:1)) }));
+  // Circular plate: J_n(j_ns · r)·cos(nθ). Frequency ∝ j².
+  const CIRCLE = [
+    [0,1,2.405],[1,1,3.832],[2,1,5.136],[0,2,5.520],[3,1,6.380],[1,2,7.016],[4,1,7.588],[2,2,8.417],[0,3,8.654],[5,1,8.771],[3,2,9.761],[6,1,9.936],[1,3,10.173]
+  ].map(([n,s,j])=>({ kind:"circle", n, s, j, f: Math.round(19*j*j) }));
+
+  function besselJ(n, x){
+    let sum = 0, term = Math.pow(x/2, n);
+    for (let k=1;k<=n;k++) term /= k;
+    for (let k=0;k<40;k++){ sum += term; term *= -(x*x/4)/((k+1)*(k+1+n)); if (Math.abs(term) < 1e-12) break; }
+    return sum;
+  }
+
+  const G = 200;
+  let field = new Float32Array(G*G), curMode = null;
+  function buildField(mode){
+    if (curMode === mode) return; curMode = mode;
+    let max = 0;
+    for (let j=0;j<G;j++) for (let i=0;i<G;i++){
+      const x = (i+0.5)/G, y = (j+0.5)/G; let v;
+      if (mode.kind === "square") {
+        const {n,m,s} = mode;
+        v = Math.cos(n*Math.PI*x)*Math.cos(m*Math.PI*y) + s*Math.cos(m*Math.PI*x)*Math.cos(n*Math.PI*y);
+      } else {
+        const dx = x*2-1, dy = y*2-1, r = Math.hypot(dx,dy);
+        v = r > 1 ? 0 : besselJ(mode.n, mode.j*r) * Math.cos(mode.n*Math.atan2(dy,dx));
+      }
+      v = Math.abs(v); field[j*G+i] = v; if (v>max) max=v;
+    }
+    if (max>0) for (let k=0;k<field.length;k++) field[k] /= max;
+  }
+
+  /* ---------- state ---------- */
+  const state = { shape:"square", f:380, sweeping:false, soundOn:false };
+  const modes = () => state.shape === "square" ? SQUARE : CIRCLE;
+  function nearest(f){
+    let best = null, bd = 1e9;
+    for (const m of modes()){ const d = Math.abs(f-m.f); if (d<bd){ bd=d; best=m; } }
+    const w = 6 + 0.012*best.f;
+    return { mode:best, R: 1/(1+Math.pow(bd/w,2)) };
+  }
+
+  /* ---------- sand particles ---------- */
+  const N = 9000;
+  const px = new Float32Array(N), py = new Float32Array(N);
+  function scatter(){
+    for (let k=0;k<N;k++){
+      if (state.shape === "square") { px[k]=Math.random(); py[k]=Math.random(); }
+      else { const r=Math.sqrt(Math.random()), t=Math.random()*Math.PI*2; px[k]=0.5+0.5*r*Math.cos(t); py[k]=0.5+0.5*r*Math.sin(t); }
+    }
+  }
+  function step(R){
+    const kick = 0.022*R;
+    for (let k=0;k<N;k++){
+      let x = px[k], y = py[k];
+      const i = Math.min(G-1, Math.max(0, (x*G)|0)), j = Math.min(G-1, Math.max(0, (y*G)|0));
+      const a = Math.sqrt(field[j*G+i])*kick + 0.0001;
+      x += (Math.random()-0.5)*a*2; y += (Math.random()-0.5)*a*2;
+      if (state.shape === "square") {
+        if (x<0) x=-x; if (x>1) x=2-x; if (y<0) y=-y; if (y>1) y=2-y;
+      } else {
+        const dx=x-0.5, dy=y-0.5, r=Math.hypot(dx,dy);
+        if (r>0.5){ const s=(1-(r-0.5))*0.5/r; x=0.5+dx*s; y=0.5+dy*s; }
+      }
+      px[k]=x; py[k]=y;
+    }
+  }
+
+  /* ---------- drawing ---------- */
+  const cv = $("plate"), ctx = cv.getContext("2d");
+  let S = 600, pad = 24, dpr = 1;
+  function fit(){
+    const r = cv.getBoundingClientRect(); dpr = Math.min(2, window.devicePixelRatio||1);
+    cv.width = Math.round(r.width*dpr); cv.height = Math.round(r.height*dpr);
+    S = cv.width; pad = Math.round(S*0.04);
+  }
+  const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  let colPlate, colRim, colSand;
+  function readColors(){ colPlate = css("--plate"); colRim = css("--plate-rim"); colSand = css("--sand"); }
+  let shake = 0;
+  function draw(R){
+    const W = S, inner = W-2*pad;
+    ctx.clearRect(0,0,W,W);
+    const jx = (Math.random()-0.5)*shake*dpr, jy = (Math.random()-0.5)*shake*dpr;
+    ctx.save(); ctx.translate(jx,jy);
+    ctx.fillStyle = colRim; ctx.strokeStyle = colRim;
+    if (state.shape === "square") {
+      ctx.fillRect(pad-6*dpr, pad-6*dpr, inner+12*dpr, inner+12*dpr);
+      ctx.fillStyle = colPlate; ctx.fillRect(pad, pad, inner, inner);
+    } else {
+      ctx.beginPath(); ctx.arc(W/2, W/2, inner/2+6*dpr, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = colPlate; ctx.beginPath(); ctx.arc(W/2, W/2, inner/2, 0, Math.PI*2); ctx.fill();
+    }
+    // centre mount (where the speaker drives the plate)
+    ctx.fillStyle = colRim; ctx.beginPath(); ctx.arc(W/2, W/2, 5*dpr, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = colSand;
+    const sz = Math.max(1.2, 1.6*dpr*S/(700*dpr));
+    for (let k=0;k<N;k++) ctx.fillRect(pad + px[k]*inner - sz/2, pad + py[k]*inner - sz/2, sz, sz);
+    ctx.restore();
+  }
+
+  /* ---------- sound ---------- */
+  let ac = null, osc = null, gain = null;
+  function vol(){ return Math.pow(+$("vol").value/100, 2) * 0.25; }
+  function soundStart(){
+    try {
+      ac = ac || new (window.AudioContext || window.webkitAudioContext)();
+      if (ac.state === "suspended") ac.resume();
+      osc = ac.createOscillator(); gain = ac.createGain();
+      osc.type = "sine"; osc.frequency.value = state.f;
+      gain.gain.value = 0; gain.gain.setTargetAtTime(vol(), ac.currentTime, 0.05);
+      osc.connect(gain).connect(ac.destination); osc.start();
+      state.soundOn = true;
+    } catch(e) { state.soundOn = false; }
+    soundUI();
+  }
+  function soundStop(){
+    if (osc && ac) { const o = osc; gain.gain.setTargetAtTime(0, ac.currentTime, 0.04); setTimeout(()=>{ try{o.stop();}catch(e){} }, 200); }
+    osc = null; state.soundOn = false; soundUI();
+  }
+  function soundUI(){ $("sound-label").textContent = state.soundOn ? "소리 끄기" : "소리 켜기"; $("sound").classList.toggle("on", state.soundOn); $("sound").classList.toggle("primary", !state.soundOn); }
+  $("sound").addEventListener("click", ()=> state.soundOn ? soundStop() : soundStart());
+  $("vol").addEventListener("input", ()=>{ if (gain && ac) gain.gain.setTargetAtTime(vol(), ac.currentTime, 0.05); });
+
+  /* ---------- frequency ---------- */
+  const NOTES = ["도","도#","레","레#","미","파","파#","솔","솔#","라","라#","시"];
+  const NOTES_EN = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+  function noteName(f){ const midi = Math.round(69 + 12*Math.log2(f/440)); const i = ((midi%12)+12)%12, o = Math.floor(midi/12)-1; return NOTES[i]+o+" ("+NOTES_EN[i]+o+")"; }
+  function setFreq(f, fromSlider){
+    state.f = Math.max(100, Math.min(2000, f));
+    if (!fromSlider) $("freq").value = String(Math.round(state.f));
+    if (osc && ac) osc.frequency.setTargetAtTime(state.f, ac.currentTime, 0.03);
+    const r = Math.round(state.f);
+    $("hz").textContent = r;
+    $("note").textContent = "1초에 " + r.toLocaleString() + "번 진동 · " + noteName(state.f) + " 근처";
+  }
+  $("freq").addEventListener("input", e=>{ stopSweep(); setFreq(+e.target.value, true); });
+  document.querySelectorAll("[data-step]").forEach(b=> b.addEventListener("click", ()=>{ stopSweep(); setFreq(state.f + +b.dataset.step); }));
+
+  function startSweep(){ state.sweeping = true; if (state.f >= 1990) setFreq(100); $("sweep-label").textContent = "멈추기"; $("sweep").classList.add("on"); if (!state.soundOn) soundStart(); }
+  function stopSweep(){ state.sweeping = false; $("sweep-label").textContent = "진동수 자동으로 올리기"; $("sweep").classList.remove("on"); }
+  $("sweep").addEventListener("click", ()=> state.sweeping ? stopSweep() : startSweep());
+
+  function renderAnswers(){
+    const chips = $("chips"), ticks = $("ticks"); chips.textContent = ""; ticks.textContent = "";
+    modes().forEach(m=>{
+      const b = document.createElement("button"); b.type="button"; b.className="chip"; b.textContent = m.f + " Hz";
+      b.addEventListener("click", ()=>{ stopSweep(); setFreq(m.f); }); chips.appendChild(b);
+      const t = document.createElement("span"); t.style.left = ((m.f-100)/1900*100) + "%"; ticks.appendChild(t);
+    });
+  }
+  $("answers").addEventListener("toggle", ()=> $("ticks").hidden = !$("answers").open);
+
+  document.querySelectorAll("[data-shape]").forEach(b=> b.addEventListener("click", ()=>{
+    state.shape = b.dataset.shape;
+    document.querySelectorAll("[data-shape]").forEach(x=> x.setAttribute("aria-pressed", String(x===b)));
+    curMode = null; scatter(); renderAnswers();
+  }));
+  $("resand").addEventListener("click", scatter);
+
+  /* ---------- loop ---------- */
+  let lastT = 0, lastOn = null;
+  function frame(t){
+    const dt = lastT ? Math.min(0.05, (t-lastT)/1000) : 0; lastT = t;
+    if (state.sweeping) {
+      const {R} = nearest(state.f);
+      setFreq(state.f + dt * 40 * (1 - 0.93*R));
+      if (state.f >= 2000) stopSweep();
+    }
+    const {mode, R} = nearest(state.f);
+    buildField(mode);
+    const subs = 3;
+    for (let s=0;s<subs;s++) step(R);
+    shake = state.soundOn ? 0.6 + 1.6*R : 0;
+    draw(R);
+    $("meter").style.width = Math.round(R*100) + "%";
+    const on = R > 0.5;
+    if (on !== lastOn) {
+      lastOn = on;
+      $("status").classList.toggle("on", on);
+      $("status-text").textContent = on ? "공명! 무늬가 만들어지고 있어요" : "공명하지 않아요 · 판이 거의 흔들리지 않아요";
+    }
+    requestAnimationFrame(frame);
+  }
+
+  function refreshTheme(){ readColors(); }
+  if (window.matchMedia) matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", refreshTheme);
+  new MutationObserver(refreshTheme).observe(document.documentElement, { attributes:true, attributeFilter:["data-theme"] });
+  new ResizeObserver(fit).observe(cv);
+
+  // open on a formed pattern so the first frame already shows what the plate does
+  readColors(); fit(); renderAnswers(); setFreq(380); scatter();
+  const first = nearest(state.f); buildField(first.mode); for (let i=0;i<400;i++) step(first.R);
+  draw(first.R);
+  requestAnimationFrame(frame);
+})();
+</script>
+
+</body>
+</html>
